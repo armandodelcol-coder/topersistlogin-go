@@ -1,9 +1,8 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"os"
-	"runtime"
 	"time"
 
 	"gioui.org/app"
@@ -26,19 +25,14 @@ func runRobotCore() {
 		panic(err)
 	}
 
-	// For linux, it is very important to wait 2 seconds
-	if runtime.GOOS == "linux" {
-		time.Sleep(2 * time.Second)
-	}
-
-	// Select keys to be pressed
-	kb.SetKeys(keybd_event.VK_F5)
-
 	for {
-		time.Sleep(7 * time.Second)
+		time.Sleep(180 * time.Second)
 		if running {
-			fmt.Println("Ligado")
+			// Select keys to be pressed
+			kb.SetKeys(keybd_event.VK_F5)
+			//fmt.Println("Ligado")
 			kb.Press()
+			kb.Release()
 		} else {
 			break
 		}
