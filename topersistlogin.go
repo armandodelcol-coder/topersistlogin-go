@@ -3,41 +3,42 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
+	"runtime"
 	"time"
 
-	"github.com/go-vgo/robotgo"
+	"gioui.org/app"
+	"gioui.org/font/gofont"
+	"gioui.org/io/system"
+	"gioui.org/layout"
+	"gioui.org/op"
+	"gioui.org/unit"
+	"gioui.org/widget"
+	"gioui.org/widget/material"
+	"github.com/micmonay/keybd_event"
 )
 
-var option = 999
+// is bot running?
+var running bool
 
-func clearCLI() {
-	c := exec.Command("clear")
-	c.Stdout = os.Stdout
-	c.Run()
-}
+func runRobotCore() {
+	kb, err := keybd_event.NewKeyBonding()
+	if err != nil {
+		panic(err)
+	}
 
-func toOnMsg() {
-	fmt.Println("No momento o Robo está Desligado...")
-	fmt.Println("[1] - Para LIGAR o robo!")
-	fmt.Println("[0] - Para FECHAR o programa!")
-}
+	// For linux, it is very important to wait 2 seconds
+	if runtime.GOOS == "linux" {
+		time.Sleep(2 * time.Second)
+	}
 
-func toOffMsg() {
-	fmt.Println("No momento o Robo está Ligado...")
-	fmt.Println("[2] - Para DESLIGAR o robo!")
-	fmt.Println("[0] - Para FECHAR o programa!")
-}
+	// Select keys to be pressed
+	kb.SetKeys(keybd_event.VK_F5)
 
-func runRobotCore(browserName string) {
-	fmt.Println("Ligando...")
 	for {
 		time.Sleep(7 * time.Second)
-		if option == 1 {
-			robotgo.ActiveName(browserName)
-			robotgo.KeyPress("f5")
-			clearCLI()
-			toOffMsg()
+		if running {
+			fmt.Println("Ligado")
+			kb.Press()
 		} else {
 			break
 		}
@@ -45,46 +46,67 @@ func runRobotCore(browserName string) {
 }
 
 func main() {
-	var browserName = "chrome"
+	go func() {
+		// create new window
+		w := app.NewWindow(
+			app.Title("Persist Login"),
+			app.Size(unit.Dp(400), unit.Dp(200)),
+		)
 
-	fmt.Println("Qual navegador será utilizado? [Padrão: chrome]")
-	fmt.Println("[1] - Chrome")
-	fmt.Println("[2] - Edge")
-	fmt.Println("[3] - Mozilla")
+		// ops are the operations from the UI
+		var ops op.Ops
 
-	var browserOpt int
-	fmt.Scan(&browserOpt)
+		// startButton is a clickable widget
+		var startButton widget.Clickable
 
-	clearCLI()
+		// th defines the material design style
+		th := material.NewTheme(gofont.Collection())
 
-	if browserOpt == 2 {
-		browserName = "edge"
-	} else if browserOpt == 3 {
-		browserName = "firefox"
-	}
+		// listen for events in the window.
+		for e := range w.Events() {
 
-	for {
-		toOnMsg()
+			// detect what type of event
+			switch e := e.(type) {
 
-		fmt.Scan(&option)
-
-		clearCLI()
-		if option == 1 {
-			go runRobotCore(browserName)
-			clearCLI()
-			toOffMsg()
-			fmt.Scan(&option)
+			// this is sent when the application should re-render.
+			case system.FrameEvent:
+				gtx := layout.NewContext(&ops, e)
+				// Let's try out the flexbox layout concept:
+				if startButton.Clicked() {
+					running = !running
+					go runRobotCore()
+				}
+				layout.Flex{
+					// Vertical alignment, from top to bottom
+					Axis: layout.Vertical,
+					// Empty space is left at the start, i.e. at the top
+					Spacing: layout.SpaceStart,
+				}.Layout(gtx,
+					// We insert two rigid elements:
+					// First a button ...
+					layout.Rigid(
+						func(gtx layout.Context) layout.Dimensions {
+							var text string
+							if !running {
+								text = "Start"
+							} else {
+								text = "Stop"
+							}
+							btn := material.Button(th, &startButton, text)
+							return btn.Layout(gtx)
+						},
+					),
+					// ... then an empty spacer
+					layout.Rigid(
+						// The height of the spacer is 25 Device independent pixels
+						layout.Spacer{Height: unit.Dp(25)}.Layout,
+					),
+				)
+				e.Frame(gtx.Ops)
+			}
 		}
 
-		clearCLI()
-		fmt.Println("Desligando...")
-
-		if option == 0 {
-			clearCLI()
-			break
-		}
-	}
-
-	fmt.Println("Robo foi ENCERRADO...")
-	fmt.Println("Não esqueça de FECHAR essa JANELA!!")
+		os.Exit(0)
+	}()
+	app.Main()
 }
